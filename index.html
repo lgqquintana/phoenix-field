@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phoenix Field Agent — Vaca Muerta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0a0c0f;
+  --bg2: #111418;
+  --bg3: #181c22;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #e8eaed;
+  --text2: #8b9099;
+  --text3: #555b65;
+  --accent: #00d084;
+  --accent2: #0099ff;
+  --amber: #f0a500;
+  --coral: #ff5c5c;
+  --purple: #a78bfa;
+  --font: 'IBM Plex Sans', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --r: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; overflow: hidden; }
+
+/* LAYOUT */
+.app { display: grid; grid-template-columns: 260px 1fr 380px; grid-template-rows: 52px 1fr; height: 100vh; }
+
+/* HEADER */
+.header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.logo-text { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0.05em; color: var(--text); }
+.logo-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-left: 4px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.btn-update {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: var(--r);
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent); font-size: 12px; font-family: var(--mono);
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-update:hover { background: var(--accent); color: var(--bg); }
+.btn-update.loading { opacity: 0.6; cursor: not-allowed; }
+.status-pill {
+  font-family: var(--mono); font-size: 11px;
+  padding: 3px 10px; border-radius: 20px;
+  border: 1px solid var(--border2); color: var(--text3);
+}
+.status-pill.ok { border-color: var(--accent); color: var(--accent); }
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px 12px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.sidebar-section-title {
+  font-size: 10px; font-family: var(--mono); letter-spacing: 0.12em;
+  color: var(--text3); text-transform: uppercase; margin-bottom: 8px;
+  padding: 0 4px;
+}
+.metric-card {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.metric-card .lbl { font-size: 11px; color: var(--text3); }
+.metric-card .val { font-size: 22px; font-weight: 600; color: var(--text); line-height: 1; }
+.metric-card .sub { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.well-list { display: flex; flex-direction: column; gap: 2px; }
+.well-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: var(--r);
+  cursor: pointer; transition: background 0.1s;
+  border: 1px solid transparent;
+}
+.well-item:hover { background: var(--bg3); }
+.well-item.active { background: var(--bg3); border-color: var(--accent); }
+.well-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.well-name { font-size: 11px; font-family: var(--mono); color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.well-qo { font-size: 11px; font-family: var(--mono); color: var(--text3); flex-shrink: 0; }
+.pill {
+  font-size: 9px; font-family: var(--mono); padding: 1px 5px;
+  border-radius: 3px; flex-shrink: 0;
+}
+.pill-c2 { background: #0099ff22; color: #0099ff; border: 1px solid #0099ff44; }
+.pill-c3 { background: #00d08422; color: #00d084; border: 1px solid #00d08444; }
+.pill-c35 { background: #f0a50022; color: #f0a500; border: 1px solid #f0a50044; }
+.pill-c4 { background: #ff5c5c22; color: #ff5c5c; border: 1px solid #ff5c5c44; }
+
+/* MAIN */
+.main {
+  overflow: hidden; display: flex; flex-direction: column;
+  background: var(--bg);
+}
+.tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  padding: 0 20px; background: var(--bg2);
+}
+.tab-btn {
+  padding: 12px 18px; font-size: 12px; font-family: var(--mono);
+  color: var(--text3); background: none; border: none; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all 0.15s; letter-spacing: 0.05em;
+}
+.tab-btn:hover { color: var(--text2); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { flex: 1; overflow-y: auto; padding: 20px; display: none; }
+.tab-content.active { display: block; }
+
+/* CHARTS */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px;
+}
+.chart-card.full { grid-column: 1 / -1; }
+.chart-title { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+.chart-wrap { position: relative; }
+
+/* WELL DETAIL */
+.well-detail { display: none; }
+.well-detail.active { display: block; }
+.well-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.well-title { font-size: 18px; font-weight: 600; font-family: var(--mono); }
+.well-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.well-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+.stat-box { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 12px; }
+.stat-lbl { font-size: 10px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.stat-val { font-size: 20px; font-weight: 600; margin-top: 2px; }
+.stat-unit { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+
+/* LEVEL COMPARISON */
+.lz-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
+.lz-card { border-radius: var(--r); padding: 14px; border: 1px solid; }
+.lz-card.c2 { background: #0099ff08; border-color: #0099ff33; }
+.lz-card.c3 { background: #00d08408; border-color: #00d08433; }
+.lz-card.c35 { background: #f0a50008; border-color: #f0a50033; }
+.lz-card.c4 { background: #ff5c5c08; border-color: #ff5c5c33; }
+.lz-name { font-family: var(--mono); font-size: 12px; font-weight: 500; margin-bottom: 8px; }
+.lz-stat { font-size: 11px; color: var(--text2); margin-top: 3px; }
+.lz-stat span { font-family: var(--mono); color: var(--text); font-weight: 500; }
+
+/* CHAT PANEL */
+.chat-panel {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  background: var(--bg2);
+}
+.chat-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.chat-header-title { font-size: 12px; font-family: var(--mono); color: var(--text2); }
+.agent-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.msg { display: flex; flex-direction: column; gap: 3px; max-width: 88%; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.agent { align-self: flex-start; align-items: flex-start; }
+.bubble {
+  padding: 9px 13px; border-radius: 10px;
+  font-size: 13px; line-height: 1.55;
+}
+.msg.user .bubble { background: #00d08422; border: 1px solid #00d08455; color: var(--text); border-bottom-right-radius: 3px; }
+.msg.agent .bubble { background: var(--bg3); border: 1px solid var(--border2); color: var(--text); border-bottom-left-radius: 3px; }
+.msg .meta { font-size: 10px; color: var(--text3); font-family: var(--mono); padding: 0 3px; }
+.typing-indicator { display: flex; gap: 4px; padding: 10px 13px; }
+.typing-indicator span { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: bounce 1.2s infinite; }
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+.quick-btns { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; border-top: 1px solid var(--border); }
+.quick-btn {
+  font-size: 11px; font-family: var(--mono); padding: 5px 10px;
+  border-radius: 20px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text3); cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.chat-input-area {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  display: flex; gap: 8px;
+}
+.chat-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 9px 12px;
+  color: var(--text); font-family: var(--font); font-size: 13px;
+  resize: none; outline: none; min-height: 40px; max-height: 100px;
+  transition: border-color 0.15s;
+}
+.chat-input:focus { border-color: var(--accent); }
+.send-btn {
+  width: 40px; height: 40px; border-radius: var(--r);
+  background: var(--accent); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: opacity 0.15s;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn svg { width: 16px; height: 16px; fill: var(--bg); }
+
+/* LEGEND */
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; font-family: var(--mono); color: var(--text3); }
+.legend-sq { width: 10px; height: 10px; border-radius: 2px; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* API KEY MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 28px; width: 420px;
+  max-width: 90vw;
+}
+.modal h2 { font-size: 16px; font-family: var(--mono); margin-bottom: 6px; }
+.modal p { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
+.modal input {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: var(--r); padding: 10px 12px; color: var(--text);
+  font-family: var(--mono); font-size: 12px; outline: none; margin-bottom: 10px;
+}
+.modal input:focus { border-color: var(--accent); }
+.modal-note { font-size: 11px; color: var(--text3); margin-bottom: 16px; }
+.btn-primary {
+  width: 100%; padding: 10px; background: var(--accent);
+  border: none; border-radius: var(--r); color: var(--bg);
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.85; }
+
+.no-data { 
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 200px; color: var(--text3); font-family: var(--mono); font-size: 12px; gap: 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>// Phoenix Field Agent</h2>
+    <p>Para usar el agente de análisis necesitás ingresar tu API key de Anthropic. Se guarda solo en tu browser (localStorage), nunca se envía a ningún servidor externo.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." />
+    <p class="modal-note">Conseguí tu key en console.anthropic.com</p>
+    <button class="btn-primary" onclick="saveApiKey()">Conectar agente ↗</button>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <span class="logo-text">PHOENIX FIELD AGENT</span>
+      <span class="logo-sub">// Vaca Muerta</span>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="dataStatus">Sin datos</div>
+      <button class="btn-update" id="btnUpdate" onclick="loadData()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Actualizar datos
+      </button>
+      <button class="btn-update" onclick="showApiModal()" style="border-color:var(--text3);color:var(--text3)">API Key</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-section-title">Campo</div>
+      <div class="metrics-grid" id="sideMetrics">
+        <div class="metric-card"><div class="lbl">Pozos</div><div class="val" id="mPozos">—</div></div>
+        <div class="metric-card"><div class="lbl">Activos</div><div class="val" id="mActivos">—</div></div>
+        <div class="metric-card"><div class="lbl">Qo total</div><div class="val" id="mQo">—</div><div class="sub">STB/d</div></div>
+        <div class="metric-card"><div class="lbl">Qg total</div><div class="val" id="mQg">—</div><div class="sub">Mscf/d</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="sidebar-section-title">Pozos — Qo actual ↓</div>
+      <div class="well-list" id="wellList"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="showTab('decline')">Declinación</button>
+      <button class="tab-btn" onclick="showTab('niveles')">Niveles</button>
+      <button class="tab-btn" onclick="showTab('well')">Pozo</button>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-content active" id="tabOverview">
+      <div class="chart-grid">
+        <div class="chart-card full">
+          <div class="chart-title">Producción mensual total — Qo por área (STB/d)</div>
+          <div class="legend" id="lgndOverview"></div>
+          <div class="chart-wrap" style="height:220px"><canvas id="chartOverview"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">GOR campo promedio (scf/STB)</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chartGOR"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Qo actual por nivel (STB/d prom)</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chartLZBar"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECLINE TAB -->
+    <div class="tab-content" id="tabDecline">
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <select id="decArea" onchange="renderDecline()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;outline:none">
+          <option value="all">Todas las áreas</option>
+          <option value="Mata Mora Norte">Matamora Norte</option>
+          <option value="Confluencia Norte">Confluencia Norte</option>
+          <option value="Confluencia Sur">Confluencia Sur</option>
+        </select>
+        <select id="decLZ" onchange="renderDecline()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;outline:none">
+          <option value="all">Todos los niveles</option>
+          <option value="C-2.0">C-2</option>
+          <option value="C-3.0">C-3</option>
+          <option value="C-3.5">C-3.5</option>
+          <option value="C-4.0">C-4</option>
+        </select>
+        <select id="decMetric" onchange="renderDecline()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:12px;outline:none">
+          <option value="qo">Qo (STB/d)</option>
+          <option value="qg">Qg (Mscf/d)</option>
+          <option value="qw">Qw (STB/d)</option>
+        </select>
+      </div>
+      <div class="legend" id="lgndDecline"></div>
+      <div class="chart-card" style="margin-bottom:0">
+        <div class="chart-wrap" style="height:400px"><canvas id="chartDecline"></canvas></div>
+      </div>
+    </div>
+
+    <!-- NIVELES TAB -->
+    <div class="tab-content" id="tabNiveles">
+      <div class="lz-grid" id="lzCards"></div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="chart-title">Qo promedio por nivel — últimos 18 meses</div>
+          <div class="legend" id="lgndLZ"></div>
+          <div class="chart-wrap" style="height:220px"><canvas id="chartLZ"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Qo pico promedio por nivel</div>
+          <div class="chart-wrap" style="height:220px"><canvas id="chartLZPeak"></canvas></div>
+        </div>
+        <div class="chart-card full">
+          <div class="chart-title">Distribución Qo actual por pozo y nivel</div>
+          <div class="chart-wrap" style="height:200px"><canvas id="chartLZScatter"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WELL DETAIL TAB -->
+    <div class="tab-content" id="tabWell">
+      <div id="wellDetailEmpty" class="no-data">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Seleccioná un pozo del panel izquierdo
+      </div>
+      <div id="wellDetailContent" class="well-detail">
+        <div class="well-header">
+          <div>
+            <div class="well-title" id="wdName"></div>
+            <div class="well-meta" id="wdMeta"></div>
+          </div>
+        </div>
+        <div class="well-stats" id="wdStats"></div>
+        <div class="chart-grid">
+          <div class="chart-card full">
+            <div class="chart-title">Producción mensual — Qo / Qg / Qw</div>
+            <div class="chart-wrap" style="height:220px"><canvas id="chartWell"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">GOR en el tiempo (scf/STB)</div>
+            <div class="chart-wrap" style="height:160px"><canvas id="chartWellGOR"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">WOR en el tiempo</div>
+            <div class="chart-wrap" style="height:160px"><canvas id="chartWellWOR"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CHAT PANEL -->
+  <aside class="chat-panel">
+    <div class="chat-header">
+      <div class="agent-dot"></div>
+      <span class="chat-header-title">Agente de campo</span>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg agent">
+        <div class="bubble">Hola. Cargá los datos del campo con "Actualizar datos" y empezamos el análisis. Podés preguntarme sobre producción, declinación, comparar pozos o niveles, y armar reportes.</div>
+        <div class="meta">Agente · ahora</div>
+      </div>
+    </div>
+    <div class="quick-btns" id="quickBtns">
+      <button class="quick-btn" onclick="quickSend('¿Cuál es el estado general del campo hoy?')">Estado del campo</button>
+      <button class="quick-btn" onclick="quickSend('¿Qué pozo está declinando más rápido?')">Declinación</button>
+      <button class="quick-btn" onclick="quickSend('Comparame el rendimiento de C-3.5 vs C-4')">C-3.5 vs C-4</button>
+      <button class="quick-btn" onclick="quickSend('¿Qué pozos tienen WOR alto?')">WOR alto</button>
+      <button class="quick-btn" onclick="quickSend('Haceme un reporte ejecutivo del campo')">Reporte</button>
+    </div>
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="chatInput" placeholder="Preguntá sobre el campo..." rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+      <button class="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22 11 13 2 9l20-7z"/></svg>
+      </button>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let WELLS = [];
+let charts = {};
+let apiKey = localStorage.getItem('phoenix_api_key') || '';
+let selectedWell = null;
+let chatHistory = [];
+
+const LZ_COLORS = {'C-2.0':'#0099ff','C-3.0':'#00d084','C-3.5':'#f0a500','C-4.0':'#ff5c5c'};
+const AREA_COLORS = {'Mata Mora Norte':'#a78bfa','Confluencia Norte':'#00d084','Confluencia Sur':'#f06292'};
+const LZ_PILL = {'C-2.0':'pill-c2','C-3.0':'pill-c3','C-3.5':'pill-c35','C-4.0':'pill-c4'};
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  if (!apiKey) {
+    document.getElementById('apiModal').style.display = 'flex';
+  } else {
+    document.getElementById('apiModal').style.display = 'none';
+  }
+  loadData();
+});
+
+// ============================================================
+// API KEY
+// ============================================================
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-')) { alert('API key inválida'); return; }
+  apiKey = key;
+  localStorage.setItem('phoenix_api_key', key);
+  document.getElementById('apiModal').style.display = 'none';
+}
+function showApiModal() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('apiModal').style.display = 'flex';
+}
+
+// ============================================================
+// DATA LOADING
+// ============================================================
+async function loadData() {
+  const btn = document.getElementById('btnUpdate');
+  btn.classList.add('loading');
+  btn.textContent = 'Cargando...';
+  try {
+    const r = await fetch('data/wells.json?t=' + Date.now());
+    if (!r.ok) throw new Error('No se encontró data/wells.json');
+    WELLS = await r.json();
+    renderAll();
+    document.getElementById('dataStatus').textContent = 'Datos OK · ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+    document.getElementById('dataStatus').className = 'status-pill ok';
+    addAgentMsg(`Datos cargados: ${WELLS.length} pozos, datos hasta ${getLatestDate()}. ¿Empezamos el análisis?`);
+  } catch(e) {
+    document.getElementById('dataStatus').textContent = 'Sin datos locales';
+    addAgentMsg('No encontré el archivo data/wells.json. Ejecutá el script update_data.py para generar los datos.');
+  } finally {
+    btn.classList.remove('loading');
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Actualizar datos';
+  }
+}
+
+function getLatestDate() {
+  let latest = '';
+  WELLS.forEach(w => w.monthly && w.monthly.forEach(m => { if (m.ym > latest) latest = m.ym; }));
+  return latest || '—';
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderSidebar();
+  renderOverview();
+  renderDecline();
+  renderNiveles();
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+function renderSidebar() {
+  const totalQo = Math.round(WELLS.reduce((s,w) => s + (w.Qo_actual||0), 0));
+  const totalQg = Math.round(WELLS.reduce((s,w) => s + (w.Qg_actual||0), 0));
+  const active = WELLS.filter(w => (w.Qo_actual||0) > 50).length;
+  document.getElementById('mPozos').textContent = WELLS.length;
+  document.getElementById('mActivos').textContent = active;
+  document.getElementById('mQo').textContent = totalQo >= 1000 ? (totalQo/1000).toFixed(1)+'k' : totalQo;
+  document.getElementById('mQg').textContent = totalQg >= 1000 ? (totalQg/1000).toFixed(1)+'k' : totalQg;
+
+  const sorted = [...WELLS].sort((a,b) => (b.Qo_actual||0) - (a.Qo_actual||0));
+  document.getElementById('wellList').innerHTML = sorted.map(w => `
+    <div class="well-item ${selectedWell===w.name?'active':''}" onclick="selectWell('${w.name}')">
+      <div class="well-dot" style="background:${LZ_COLORS[w.lz]||'#555'}"></div>
+      <span class="well-name">${w.name.split('.').pop()}</span>
+      <span class="well-qo">${Math.round(w.Qo_actual||0)}</span>
+      <span class="pill ${LZ_PILL[w.lz]||''}">${(w.lz||'').replace('C-','C')}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+function renderOverview() {
+  const areas = ['Mata Mora Norte','Confluencia Norte','Confluencia Sur'];
+  const allYM = [...new Set(WELLS.flatMap(w => (w.monthly||[]).map(m => m.ym)))].sort();
+  const recent = allYM.slice(-24);
+
+  document.getElementById('lgndOverview').innerHTML = areas.map(a =>
+    `<div class="legend-item"><div class="legend-sq" style="background:${AREA_COLORS[a]}"></div>${a==='Mata Mora Norte'?'Matamora N.':a}</div>`
+  ).join('');
+
+  const datasets = areas.map(a => ({
+    label: a, fill: true,
+    data: recent.map(ym => Math.round(
+      WELLS.filter(w => w.subarea===a).reduce((s,w) => { const m=(w.monthly||[]).find(x=>x.ym===ym); return s+(m?m.qo:0); }, 0)
+    )),
+    backgroundColor: AREA_COLORS[a]+'44', borderColor: AREA_COLORS[a], borderWidth: 1.5
+  }));
+
+  destroyChart('overview');
+  charts.overview = new Chart(document.getElementById('chartOverview'), {
+    type: 'bar',
+    data: { labels: recent, datasets },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{stacked:true,ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},
+        y:{stacked:true,ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10},callback:v=>v>=1000?Math.round(v/1000)+'k':v}},
+        grid:{color:'rgba(255,255,255,0.04)'} }}
+  });
+
+  // GOR
+  const gorData = recent.map(ym => {
+    let tQo=0,tQg=0;
+    WELLS.forEach(w => { const m=(w.monthly||[]).find(x=>x.ym===ym); if(m){tQo+=m.qo;tQg+=m.qg;} });
+    return tQo>0 ? Math.round(tQg/tQo*1000) : null;
+  });
+  destroyChart('gor');
+  charts.gor = new Chart(document.getElementById('chartGOR'), {
+    type:'line',
+    data:{labels:recent,datasets:[{data:gorData,borderColor:'#a78bfa',backgroundColor:'#a78bfa22',tension:0.3,pointRadius:2,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:8,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},
+        y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+
+  // LZ bar
+  const lzs=['C-2.0','C-3.0','C-3.5','C-4.0'];
+  const lzAvg = lzs.map(lz => {
+    const ws = WELLS.filter(w=>w.lz===lz);
+    return ws.length>0 ? Math.round(ws.reduce((s,w)=>s+(w.Qo_actual||0),0)/ws.length) : 0;
+  });
+  destroyChart('lzbar');
+  charts.lzbar = new Chart(document.getElementById('chartLZBar'),{
+    type:'bar',
+    data:{labels:['C-2','C-3','C-3.5','C-4'],datasets:[{data:lzAvg,backgroundColor:lzs.map(l=>LZ_COLORS[l]+'88'),borderColor:lzs.map(l=>LZ_COLORS[l]),borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+}
+
+// ============================================================
+// DECLINE
+// ============================================================
+function renderDecline() {
+  const area = document.getElementById('decArea')?.value || 'all';
+  const lz = document.getElementById('decLZ')?.value || 'all';
+  const metric = document.getElementById('decMetric')?.value || 'qo';
+
+  const filtered = WELLS.filter(w => {
+    if (area !== 'all' && w.subarea !== area) return false;
+    if (lz !== 'all' && w.lz !== lz) return false;
+    return true;
+  });
+
+  document.getElementById('lgndDecline').innerHTML = Object.entries(LZ_COLORS).map(([k,v]) =>
+    `<div class="legend-item"><div class="legend-sq" style="background:${v}"></div>${k}</div>`
+  ).join('');
+
+  const datasets = filtered.map(w => ({
+    label: w.name.split('.').pop(),
+    data: (w.monthly||[]).map(m => ({ x: m.ym, y: m[metric] || 0 })),
+    borderColor: LZ_COLORS[w.lz] || '#555',
+    backgroundColor: 'transparent', borderWidth: 1.2, pointRadius: 0, tension: 0.2
+  }));
+
+  destroyChart('decline');
+  charts.decline = new Chart(document.getElementById('chartDecline'), {
+    type:'line', data:{datasets},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{title:i=>i[0]?.raw?.x,label:i=>`${i.dataset.label}: ${Math.round(i.raw.y)}`}}},
+      scales:{x:{type:'category',ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},
+        y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10},callback:v=>v>=1000?Math.round(v/1000)+'k':v}},
+        grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+}
+
+// ============================================================
+// NIVELES
+// ============================================================
+function renderNiveles() {
+  const lzs = ['C-2.0','C-3.0','C-3.5','C-4.0'];
+  const lzNames = {'C-2.0':'C-2','C-3.0':'C-3','C-3.5':'C-3.5','C-4.0':'C-4'};
+  const lzClass = {'C-2.0':'c2','C-3.0':'c3','C-3.5':'c35','C-4.0':'c4'};
+
+  document.getElementById('lzCards').innerHTML = lzs.map(lz => {
+    const ws = WELLS.filter(w=>w.lz===lz);
+    const avgCurrent = ws.length>0 ? Math.round(ws.reduce((s,w)=>s+(w.Qo_actual||0),0)/ws.length) : 0;
+    const avgPeak = ws.length>0 ? Math.round(ws.reduce((s,w)=>s+(w.Qo_max||0),0)/ws.length) : 0;
+    return `<div class="lz-card ${lzClass[lz]}">
+      <div class="lz-name" style="color:${LZ_COLORS[lz]}">${lzNames[lz]}</div>
+      <div class="lz-stat">${ws.length} pozos</div>
+      <div class="lz-stat">Actual prom: <span>${avgCurrent} STB/d</span></div>
+      <div class="lz-stat">Pico prom: <span>${avgPeak} STB/d</span></div>
+    </div>`;
+  }).join('');
+
+  const allYM = [...new Set(WELLS.flatMap(w=>(w.monthly||[]).map(m=>m.ym)))].sort();
+  const recent = allYM.slice(-18);
+
+  document.getElementById('lgndLZ').innerHTML = lzs.map(lz =>
+    `<div class="legend-item"><div class="legend-sq" style="background:${LZ_COLORS[lz]}"></div>${lzNames[lz]}</div>`
+  ).join('');
+
+  const lzDatasets = lzs.map(lz => ({
+    label: lzNames[lz],
+    data: recent.map(ym => {
+      const ws = WELLS.filter(w=>w.lz===lz);
+      const vals = ws.map(w=>{const m=(w.monthly||[]).find(x=>x.ym===ym);return m?m.qo:null;}).filter(v=>v!==null);
+      return vals.length>0?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+    }),
+    borderColor: LZ_COLORS[lz], backgroundColor: LZ_COLORS[lz]+'22',
+    tension:0.3,pointRadius:2,borderWidth:2
+  }));
+
+  destroyChart('lz');
+  charts.lz = new Chart(document.getElementById('chartLZ'),{
+    type:'line',data:{labels:recent,datasets:lzDatasets},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:9,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},
+        y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+
+  destroyChart('lzpeak');
+  charts.lzpeak = new Chart(document.getElementById('chartLZPeak'),{
+    type:'bar',
+    data:{labels:lzs.map(l=>lzNames[l]),datasets:[{
+      label:'Qo pico prom',data:lzs.map(lz=>{const ws=WELLS.filter(w=>w.lz===lz);return ws.length>0?Math.round(ws.reduce((s,w)=>s+(w.Qo_max||0),0)/ws.length):0;}),
+      backgroundColor:lzs.map(l=>LZ_COLORS[l]+'88'),borderColor:lzs.map(l=>LZ_COLORS[l]),borderWidth:1
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+
+  destroyChart('lzscatter');
+  charts.lzscatter = new Chart(document.getElementById('chartLZScatter'),{
+    type:'scatter',
+    data:{datasets:lzs.map(lz=>({
+      label:lzNames[lz],
+      data:WELLS.filter(w=>w.lz===lz).map((w,i)=>({x:i,y:w.Qo_actual||0,name:w.name})),
+      backgroundColor:LZ_COLORS[lz]+'cc',pointRadius:5,pointHoverRadius:7
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:i=>`${i.raw.name?.split('.').pop()}: ${Math.round(i.raw.y)} STB/d`}}},
+      scales:{x:{display:false},y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}},grid:{color:'rgba(255,255,255,0.04)'}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+}
+
+// ============================================================
+// WELL DETAIL
+// ============================================================
+function selectWell(name) {
+  selectedWell = name;
+  const w = WELLS.find(x=>x.name===name);
+  if (!w) return;
+  renderSidebar();
+  showTab('well');
+  document.getElementById('wellDetailEmpty').style.display = 'none';
+  document.getElementById('wellDetailContent').classList.add('active');
+
+  document.getElementById('wdName').textContent = w.name;
+  document.getElementById('wdMeta').textContent = `${w.subarea} · ${w.lz} · ${w.pad} · Inicio: ${w.fecha_inicio} · Lw: ${Math.round(w.lw||0)}m`;
+
+  document.getElementById('wdStats').innerHTML = [
+    {lbl:'Qo actual',val:Math.round(w.Qo_actual||0),unit:'STB/d',color:'#00d084'},
+    {lbl:'Qo pico',val:Math.round(w.Qo_max||0),unit:'STB/d',color:'#a78bfa'},
+    {lbl:'GOR actual',val:Math.round(w.GOR_actual||0),unit:'scf/STB',color:'#f0a500'},
+    {lbl:'WOR actual',val:(w.WOR_actual||0).toFixed(2),unit:'',color:w.WOR_actual>1?'#ff5c5c':'#8b9099'}
+  ].map(s=>`<div class="stat-box"><div class="stat-lbl">${s.lbl}</div><div class="stat-val" style="color:${s.color}">${s.val}</div><div class="stat-unit">${s.unit}</div></div>`).join('');
+
+  const monthly = w.monthly || [];
+  const labels = monthly.map(m=>m.ym);
+
+  destroyChart('well');
+  charts.well = new Chart(document.getElementById('chartWell'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Qo',data:monthly.map(m=>m.qo||0),backgroundColor:'#00d08466',borderColor:'#00d084',borderWidth:1},
+      {label:'Qg',data:monthly.map(m=>m.qg||0),backgroundColor:'#f0a50066',borderColor:'#f0a500',borderWidth:1},
+      {label:'Qw',data:monthly.map(m=>m.qw||0),backgroundColor:'#0099ff55',borderColor:'#0099ff',borderWidth:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8b9099',font:{family:'IBM Plex Mono',size:10}}}},
+      scales:{x:{stacked:true,ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:12,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},
+        y:{stacked:true,ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+
+  destroyChart('wellgor');
+  charts.wellgor = new Chart(document.getElementById('chartWellGOR'),{
+    type:'line',
+    data:{labels,datasets:[{data:monthly.map(m=>m.qo>0?Math.round(m.qg/m.qo*1000):null),borderColor:'#f0a500',backgroundColor:'#f0a50022',tension:0.3,pointRadius:2,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:8,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+
+  destroyChart('wellwor');
+  charts.wellwor = new Chart(document.getElementById('chartWellWOR'),{
+    type:'line',
+    data:{labels,datasets:[{data:monthly.map(m=>m.qo>0?parseFloat((m.qw/m.qo).toFixed(2)):null),borderColor:'#ff5c5c',backgroundColor:'#ff5c5c22',tension:0.3,pointRadius:2,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:8,color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},y:{ticks:{color:'#555b65',font:{family:'IBM Plex Mono',size:10}}},grid:{color:'rgba(255,255,255,0.04)'}}}
+  });
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function showTab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',['overview','decline','niveles','well'][i]===t));
+  document.querySelectorAll('.tab-content').forEach((c,i)=>c.classList.toggle('active',['tabOverview','tabDecline','tabNiveles','tabWell'][i]==='tab'+t.charAt(0).toUpperCase()+t.slice(1)));
+  if(t==='decline') renderDecline();
+  if(t==='niveles') renderNiveles();
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+function buildContext() {
+  if (!WELLS.length) return 'No hay datos cargados todavía.';
+  const nActive = WELLS.filter(w=>(w.Qo_actual||0)>50).length;
+  const totalQo = Math.round(WELLS.reduce((s,w)=>s+(w.Qo_actual||0),0));
+  const lzSummary = ['C-2.0','C-3.0','C-3.5','C-4.0'].map(lz=>{
+    const ws=WELLS.filter(w=>w.lz===lz);
+    const avg=ws.length>0?Math.round(ws.reduce((s,w)=>s+(w.Qo_actual||0),0)/ws.length):0;
+    return `${lz}: ${ws.length} pozos, prom actual ${avg} STB/d`;
+  }).join(' | ');
+  const topWells = [...WELLS].sort((a,b)=>(b.Qo_actual||0)-(a.Qo_actual||0)).slice(0,5).map(w=>`${w.name}=${Math.round(w.Qo_actual||0)}STB/d`).join(', ');
+  const latest = getLatestDate();
+  const wellDetails = WELLS.slice(0,40).map(w=>`${w.name}(${w.lz},${w.pad},Qo_actual=${Math.round(w.Qo_actual||0)},Qo_max=${Math.round(w.Qo_max||0)},GOR=${Math.round(w.GOR_actual||0)},WOR=${(w.Qo_actual||0)>0?(w.WOR_actual||0).toFixed(2):'—'},inicio=${w.fecha_inicio})`).join('\n');
+
+  return `CONTEXTO DEL CAMPO — Phoenix Global Resources — Vaca Muerta — Formación Mina Muerta
+Datos hasta: ${latest}
+Total pozos: ${WELLS.length} (${nActive} activos >50 STB/d)
+Qo campo total: ${totalQo} STB/d
+Por nivel (C-2=inferior, C-3=medio, C-3.5=superior, C-4=nuevo nivel en exploración): ${lzSummary}
+Top 5 productores: ${topWells}
+Bloques: Matamora Norte (KIL/PET-MMo), Confluencia Norte (CoN), Confluencia Sur (CoS)
+
+DETALLE POR POZO:
+${wellDetails}`;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || !apiKey) {
+    if (!apiKey) showApiModal();
+    return;
+  }
+  input.value = '';
+  addUserMsg(text);
+
+  chatHistory.push({role:'user',content:text});
+  const typing = addTyping();
+
+  try {
+    const systemPrompt = `Sos un ingeniero de reservorios senior especializado en yacimientos no convencionales de Vaca Muerta. Analizás datos de producción de Phoenix Global Resources de forma crítica y práctica. Respondés en español, de forma directa y técnica. Cuando ves datos relevantes, los mencionás con números concretos. Si algo llama la atención (WOR alto, GOR anómalo, declinación inusual), lo señalás proactivamente. Usás terminología de la industria: STB/d para petróleo, Mscf/d para gas, GOR, WOR, landing zone, pad, etc.
+
+${buildContext()}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: chatHistory.slice(-10)
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reply = data.content[0]?.text || 'Sin respuesta';
+    chatHistory.push({role:'assistant',content:reply});
+    typing.remove();
+    addAgentMsg(reply);
+  } catch(e) {
+    typing.remove();
+    addAgentMsg(`Error: ${e.message}. Verificá tu API key.`);
+  }
+}
+
+function quickSend(text) {
+  document.getElementById('chatInput').value = text;
+  sendMessage();
+}
+
+function addUserMsg(text) {
+  const c = document.getElementById('chatMessages');
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = `<div class="bubble">${escHtml(text)}</div><div class="meta">${ts()}</div>`;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+}
+
+function addAgentMsg(text) {
+  const c = document.getElementById('chatMessages');
+  const d = document.createElement('div');
+  d.className = 'msg agent';
+  d.innerHTML = `<div class="bubble">${formatMsg(text)}</div><div class="meta">Agente · ${ts()}</div>`;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+}
+
+function addTyping() {
+  const c = document.getElementById('chatMessages');
+  const d = document.createElement('div');
+  d.className = 'msg agent';
+  d.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+  return d;
+}
+
+function formatMsg(text) {
+  return escHtml(text)
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+}
+
+function escHtml(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function ts() { return new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }
+
+function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
+</script>
+</body>
+</html>
