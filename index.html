@@ -324,6 +324,13 @@ html, body {
   50%      { box-shadow: 0 0 0 7px rgba(124,58,237,0.15), 0 0 36px rgba(124,58,237,0.7); }
 }
 
+.ibtn-stop {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #ef4444;
+}
+.ibtn-stop:hover { background: rgba(239,68,68,0.28); }
+
 .ibtn-send {
   background: linear-gradient(135deg, #7c3aed, #0891b2);
   color: #fff;
@@ -485,6 +492,7 @@ html, body {
         rows="1"
         onkeydown="handleKey(event)"
         oninput="autoResize(this)"></textarea>
+      <button class="ibtn ibtn-stop" id="stopBtn" onclick="stopAll()" title="Detener" style="display:none">⏹️</button>
       <button class="ibtn ibtn-mic" id="micBtn" onclick="toggleMic()" title="Hablar">🎙️</button>
       <button class="ibtn ibtn-send" id="sendBtn" onclick="send()" title="Enviar">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -942,6 +950,12 @@ function initRec() {
   return r;
 }
 
+function stopAll() {
+  window.speechSynthesis?.cancel();
+  stopMic();
+  setThinking(false);
+}
+
 function toggleMic() { micActive ? stopMic() : startMic(); }
 
 function startMic() {
@@ -970,8 +984,8 @@ function speak(text) {
   const vs  = window.speechSynthesis.getVoices();
   const esv = vs.find(v=>v.lang==='es-AR') || vs.find(v=>v.lang.startsWith('es'));
   if (esv) u.voice = esv;
-  u.onstart = () => setStatus('speaking','Hablando...');
-  u.onend   = () => setStatus('ready','Listo');
+  u.onstart = () => { setStatus('speaking','Hablando...'); document.getElementById('stopBtn').style.display='flex'; };
+  u.onend   = () => { setStatus('ready','Listo'); document.getElementById('stopBtn').style.display='none'; };
   window.speechSynthesis.speak(u);
 }
 
@@ -1025,6 +1039,7 @@ function setStatus(state, txt) {
 function setThinking(v) {
   thinking = v;
   document.getElementById('sendBtn').disabled = v;
+  document.getElementById('stopBtn').style.display = v ? 'flex' : 'none';
   if (v) setStatus('thinking','Analizando...');
   else   setStatus('ready','Listo');
 }
