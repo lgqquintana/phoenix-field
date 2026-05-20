@@ -690,8 +690,26 @@ Online: days_online(d), gor_cum(scf/STB), wor_cum
 FMB: ooip_fmb(MSTB), ogip_fmb(MMscf), area_fmb(acres)
 Recovery: rf_oil_pct(%), rf_gas_pct(%)
 
-DATOS DE ${WELLS.length} POZOS:
-${JSON.stringify(data)}`;
+DATOS DE ${WELLS.length} POZOS (un bloque por pozo):
+${data.map(w => {
+  const f = (k) => w[k] != null ? w[k] : '—';
+  return `
+[${w.name}]
+pad=${f('pad')} | lz=${f('lz')} | subarea=${f('subarea')}
+lw=${f('lw')}m | stages=${f('stages')} | clusters=${f('clusters')} | spacing=${f('spacing')}m | tvd=${f('tvd_m')}m
+fluid=${f('fluid_m3')}m³ | arena=${f('sand_mlb')}Mlb
+fechas: inicio=${f('fecha_inicio')} | complet=${f('fecha_completacion')} | ultimo=${f('fecha_ultimo')}
+reservorio: p_res_i=${f('p_res_i')}psi | phi=${f('phi')}% | sw_i=${f('sw_i')}% | h_net=${f('h_net')}m | h_frac=${f('h_frac')}m | t_res=${f('t_res')}F | gradient=${f('gradient')}psi/ft
+pvt: api=${f('api')} | gor_pvt=${f('gor_pvt')}scf/STB | psat=${f('psat')}psi
+DCA: b_oil_dca=${f('b_oil_dca')} | b_gas_dca=${f('b_gas_dca')} | eur_oil_dca=${f('eur_oil_dca')}MSTB | eur_gas_dca=${f('eur_gas_dca')}MMscf | eur_wat_dca=${f('eur_wat_dca')}MSTB | eur_oil_lw=${f('eur_oil_lw')}STB/ft | eur_gas_lw=${f('eur_gas_lw')}Mscf/ft
+PNR: b_oil_pnr=${f('b_oil_pnr')} | b_gas_pnr=${f('b_gas_pnr')} | eur_oil_pnr=${f('eur_oil_pnr')}MSTB | eur_gas_pnr=${f('eur_gas_pnr')}MMscf
+acum: cum_oil=${f('cum_oil')}MSTB | cum_gas=${f('cum_gas')}MMscf | cum_wat=${f('cum_wat')}MSTB | days_online=${f('days_online')}d
+IP: ip30=${f('ip30_oil')} | ip60=${f('ip60_oil')} | ip90=${f('ip90_oil')} | ip180=${f('ip180_oil')} | ip365=${f('ip365_oil')} STB/d | peak_oil=${f('peak_oil')}STB/d | peak_gas=${f('peak_gas')}MMscf/d
+actual: Qo=${f('Qo_actual')}m³/d | Qg=${f('Qg_actual')}m³/d | Qw=${f('Qw_actual')}m³/d | GOR=${f('GOR_actual')} | WOR=${f('WOR_actual')} | Qo_max=${f('Qo_max')}m³/d
+gor_cum=${f('gor_cum')}scf/STB | wor_cum=${f('wor_cum')}
+FMB: ooip=${f('ooip_fmb')}MSTB | ogip=${f('ogip_fmb')}MMscf | area=${f('area_fmb')}acres
+RF: rf_oil=${f('rf_oil_pct')}% | rf_gas=${f('rf_gas_pct')}%`;
+}).join('\n')}`;
 
   return sysPromptCache;
 }
