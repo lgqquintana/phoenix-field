@@ -641,6 +641,12 @@ COMPORTAMIENTO:
 - El usuario puede estar hablando por voz: adaptá el tono (natural, conversacional)
 - Para análisis técnicos podés usar listas o tablas en texto
 
+PRECISIÓN NUMÉRICA — MUY IMPORTANTE:
+- Citá siempre el valor EXACTO del campo solicitado, sin redondear ni inferir
+- No confundas campos similares: b_oil_dca ≠ b_gas_dca, eur_oil_dca ≠ eur_oil_pnr, etc.
+- Si el usuario pregunta por "b de petróleo" → es b_oil_dca. Si pregunta por "b de gas" → es b_gas_dca
+- Antes de responder un valor numérico, verificá que el nombre del campo coincida exactamente
+
 UNIDADES:
 - Caudales producción (monthly): m³/d
 - IPs: STB/d (ip30_oil…ip365_oil, peak_oil) | MMscf/d (peak_gas)
